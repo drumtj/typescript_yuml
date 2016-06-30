@@ -1,0 +1,42 @@
+{
+    "version": "1.5.0-beta",
+    "compilerOptions": {
+        "target": "es5",
+        "module": "commonjs",
+        "isolatedModules": false,
+        "jsx": "react",
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "declaration": false,
+        "noImplicitAny": false,
+        "removeComments": true,
+        "noLib": false,
+        "preserveConstEnums": true,
+        "suppressImplicitAnyIndexErrors": true,
+        "outDir": "../js"
+    },
+    "filesGlob": [
+        "./**/*.ts",
+        "./**/*.tsx",
+        "!./node_modules/**/*"
+    ],
+    "files": [
+        "./background.ts",
+        "./chrome/chrome.d.ts",
+        "./jquery/jquery.d.ts",
+        "./jquery/jqueryui.d.ts",
+        "./lodash/lodash.d.ts",
+        "./setBuildPage.ts",
+        "./setViewPage.ts",
+        "./SideView.ts",
+        "./TSFile.ts",
+        "./TSFileDropper.ts",
+        "./TSFileListView.ts",
+        "./TSParser/TSParser.d.ts",
+        "./typescript/typescriptServices.d.ts",
+        "./webrtc/MediaStream.d.ts"
+    ],
+    "atom": {
+        "rewriteTsconfig": true
+    }
+}
