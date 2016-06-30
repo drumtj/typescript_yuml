@@ -33,8 +33,7 @@
         "./TSFileDropper.ts",
         "./TSFileListView.ts",
         "./TSParser/TSParser.d.ts",
-        "./typescript/typescriptServices.d.ts",
-        "./webrtc/MediaStream.d.ts"
+        "./typescript/typescriptServices.d.ts"
     ],
     "atom": {
         "rewriteTsconfig": true
