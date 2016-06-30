@@ -40,7 +40,7 @@ class TSFileDropper{
 		  $state.addClass('fail');
 		} else {
 		  $state.addClass('success');
-		  $state.html('File API & FileReader available');
+		  $state.html('FileReader available');
 		}
 
     $holder.bind("dragover", function () { this.className = 'hover'; return false; });

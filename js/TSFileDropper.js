@@ -1,6 +1,3 @@
-/// <reference path="./jquery/jquery.d.ts"/>
-/// <reference path="./TSFile.ts"/>
-/// <reference path="./TSFileListView.ts"/>
 var TSFileDropper = (function () {
     function TSFileDropper(fileListView, fileDropHandle) {
         this.fileListView = fileListView;
@@ -22,7 +19,7 @@ var TSFileDropper = (function () {
         }
         else {
             $state.addClass('success');
-            $state.html('File API & FileReader available');
+            $state.html('FileReader available');
         }
         $holder.bind("dragover", function () { this.className = 'hover'; return false; });
         $holder.bind("dragend", function () { this.className = ''; return false; });
@@ -66,4 +63,4 @@ var TSFileDropper = (function () {
         });
     }
     return TSFileDropper;
-})();
+}());
