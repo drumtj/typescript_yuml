@@ -1,6 +1,3 @@
-/// <reference path="./jquery/jquery.d.ts"/>
-/// <reference path="./lodash/lodash.d.ts"/>
-/// <reference path="./TSFile.ts"/>
 var TSFileListView = (function () {
     function TSFileListView(width, height, color) {
         if (width === void 0) { width = "100%"; }
@@ -68,9 +65,10 @@ var TSFileListView = (function () {
         for (var i = 0; i < this.list.length; i++) {
             if (this.list[i].enable) {
                 t.push(this.list[i].text);
+                t.push("/*eof*/");
             }
         }
         return t.join('\n');
     };
     return TSFileListView;
-})();
+}());

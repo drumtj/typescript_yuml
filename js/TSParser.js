@@ -3,7 +3,6 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-/// <reference path="../../typescript/typescriptServices.d.ts"/>
 var tj;
 (function (tj) {
     var utils;
@@ -15,12 +14,12 @@ var tj;
                 this.log = function (_) { };
                 this.trace = function (_) { };
                 this.error = function (_) { };
-                this.getCompilationSettings = ts.getDefaultCompilerOptions;
                 this.getScriptIsOpen = function (_) { return true; };
                 this.getCurrentDirectory = function () { return ""; };
                 this.getDefaultLibFileName = function (_) { return "lib"; };
                 this.getScriptVersion = function (fileName) { return _this.files[fileName].ver.toString(); };
                 this.getScriptSnapshot = function (fileName) { return _this.files[fileName] ? _this.files[fileName].file : null; };
+                this.getCompilationSettings = ts.getDefaultCompilerOptions;
             }
             MyLanguageServiceHost.prototype.getScriptFileNames = function () {
                 var names = [];
@@ -65,9 +64,15 @@ var tj;
             return MyCompilerHost;
         })(MyLanguageServiceHost);
         var RelationList = (function () {
-            function RelationList() {
+            function RelationList(exceptList) {
                 this.regDefaultArrayType = /＜([A-za-z_\$]+)＞/;
                 this.relation = [];
+                if (exceptList) {
+                    this.exceptList = JSON.parse(JSON.stringify(exceptList));
+                }
+                else {
+                    this.exceptList = {};
+                }
             }
             Object.defineProperty(RelationList.prototype, "length", {
                 get: function () {
@@ -79,7 +84,13 @@ var tj;
                 enumerable: true,
                 configurable: true
             });
+            RelationList.prototype.addExceptionName = function (name) {
+                if (name)
+                    this.exceptList[name] = 0;
+            };
             RelationList.prototype.add = function (str) {
+                if (typeof this.exceptList[str] !== "undefined")
+                    return;
                 if (!TSParser.isDefaultType(str)) {
                     if (str.indexOf('［') > -1) {
                         str = str.replace(/［］/g, '');
@@ -98,6 +109,7 @@ var tj;
             };
             RelationList.prototype.reset = function () {
                 this.relation.length = 0;
+                this.exceptList = {};
             };
             RelationList.prototype.getList = function () {
                 var a = this.relation;
@@ -116,6 +128,10 @@ var tj;
         var TSParser = (function () {
             function TSParser() {
             }
+            TSParser.init = function () {
+                TSParser.host = new MyCompilerHost();
+                TSParser.languageService = ts.createLanguageService(TSParser.host, ts.createDocumentRegistry());
+            };
             TSParser.getKindModifiersChar = function (kindModifiers) {
                 switch (kindModifiers) {
                     case "":
@@ -173,7 +189,7 @@ var tj;
             };
             TSParser.getTypeString = function (typeChecker, type, symbol) {
                 var str = typeChecker.typeToString(type);
-                if (str == "{}")
+                if (str.indexOf("{") > -1)
                     return "any";
                 if (str.charAt(0) == "(")
                     return "Function";
@@ -223,6 +239,36 @@ var tj;
             };
             TSParser.tsToAnalysisObject = function (text, findUnknownObject) {
                 if (findUnknownObject === void 0) { findUnknownObject = true; }
+                var importList;
+                if (text.indexOf("/*eof*/") > -1) {
+                    var expImportList = /(^|\n)(\s+)?import (\s+)?[\w\d\$\_]+(\s+)?\=(\s+)?require\((\s+)?(\'([\w\d\/\$\_\.\-]+)\'|\"([\w\d\/\$\_\.\-]+)\")(\s+)?\)/g;
+                    var expRequirePath = /(\'([\w\d\/\$\_\.\-]+)\'|\"([\w\d\/\$\_\.\-]+)\")/;
+                    var expExportName = /\n(\s+)?export(\s+)?\=(\s+)?([\w\d\$\_]+)/;
+                    var classTexts = text.split("/*eof*/");
+                    var exportName, exportMatch;
+                    var importMatch, tempArr;
+                    importList = {};
+                    classTexts.pop();
+                    for (var i = 0; i < classTexts.length; i++) {
+                        exportMatch = classTexts[i].match(expExportName);
+                        if (exportMatch) {
+                            exportName = exportMatch.pop();
+                            importList[exportName] = importList[exportName] || {};
+                            importMatch = classTexts[i].match(expImportList);
+                            if (importMatch) {
+                                importList[exportName] = {};
+                                for (var i_1 = 0; i_1 < importMatch.length; i_1++) {
+                                    tempArr = importMatch[i_1].match(expRequirePath);
+                                    if (tempArr) {
+                                        importList[exportName][(tempArr.pop() || tempArr.pop()).split('/').pop()] = 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    console.log("importList", importList);
+                }
+                text = text.replace(/^(\s+)?import\s/g, "//import ").replace(/\n(\s+)?import\s/g, "//import ").replace(/\n(\s+)?export\s?\=/g, "//export=");
                 TSParser.host.addFile(TSParser.dummyScriptName, text);
                 var program = ts.createProgram([TSParser.dummyScriptName], TSParser.host.getCompilationSettings(), TSParser.host);
                 var typeChecker = program.getTypeChecker();
@@ -240,6 +286,12 @@ var tj;
                 var name;
                 var st;
                 var modifier;
+                var implementList;
+                var exp_implementList = /implements (\w+)\,?\s?(\w+)?\,?\s?(\w+)?{/;
+                var methodGenericMatch;
+                var exp_generic = /<(\w+)( extends )?(\w+)?>/;
+                var propertyInfo, methodInfo;
+                var genericList = {};
                 for (var key in decls) {
                     for (var key1 in decls[key]) {
                         nd = decls[key][key1];
@@ -252,6 +304,16 @@ var tj;
                         if (k == TSParser.STR_CLASS || k == TSParser.STR_INTERFACE) {
                             if (typeof data[k] === TSParser.STR_UNDEFINED)
                                 data[k] = [];
+                            classObj = {
+                                name: name,
+                                type: TSParser.getTypeString(typeChecker, type),
+                                modifier: modifier,
+                                text: ts.getTextOfNode(nd)
+                            };
+                            methodGenericMatch = classObj.text.substr(0, classObj.text.indexOf('{')).match(exp_generic);
+                            if (methodGenericMatch) {
+                                genericList[methodGenericMatch[1]] = 0;
+                            }
                             expList = [];
                             if (typeof nd["heritageClauses"] !== TSParser.STR_UNDEFINED) {
                                 var hnd = nd["heritageClauses"][0];
@@ -270,13 +332,18 @@ var tj;
                                     expNameArr.length = 0;
                                 }
                             }
-                            classObj = {
-                                name: name,
-                                type: TSParser.getTypeString(typeChecker, type),
-                                modifier: modifier,
-                                super: expList,
-                                text: ts.getTextOfNode(nd)
-                            };
+                            var impList = [];
+                            implementList = classObj.text.match(exp_implementList);
+                            if (implementList) {
+                                implementList.shift();
+                                for (var o = 0; o < implementList.length; o++) {
+                                    if (implementList[o]) {
+                                        impList.push(implementList[o]);
+                                    }
+                                }
+                            }
+                            classObj.super = expList;
+                            classObj.implements = impList;
                             data[k].push(classObj);
                             nd2 = nd.symbol.getDeclarations()[0];
                             ty2 = typeChecker.getTypeAtLocation(nd2);
@@ -291,21 +358,27 @@ var tj;
                                 nd3 = symbol.getDeclarations()[0];
                                 ty3 = typeChecker.getTypeAtLocation(nd3);
                                 if (l == TSParser.STR_PROPERTY) {
-                                    classObj[l].push({
+                                    propertyInfo = {
                                         name: ts.getDeclaredName(typeChecker, symbol, nd3),
                                         type: TSParser.getTypeString(typeChecker, ty3, (findUnknownObject ? symbol : null)),
                                         modifier: TSParser.getNodeModifiers(nd3)
-                                    });
+                                    };
+                                    classObj[l].push(propertyInfo);
                                 }
                                 else if (l == TSParser.STR_METHOD) {
                                     st = ty3.getCallSignatures()[0];
-                                    classObj[l].push({
+                                    methodInfo = {
                                         name: ts.getDeclaredName(typeChecker, symbol, nd3),
                                         type: TSParser.getTypeString(typeChecker, st.getReturnType(), (findUnknownObject ? symbol : null)),
                                         modifier: TSParser.getNodeModifiers(nd3),
                                         parameters: TSParser.getParameterInfo(typeChecker, st, findUnknownObject),
                                         text: ts.getTextOfNode(nd3)
-                                    });
+                                    };
+                                    methodGenericMatch = methodInfo.text.substr(0, methodInfo.text.indexOf('{')).match(exp_generic);
+                                    if (methodGenericMatch) {
+                                        genericList[methodGenericMatch[1]] = 0;
+                                    }
+                                    classObj[l].push(methodInfo);
                                 }
                             }
                         }
@@ -322,22 +395,28 @@ var tj;
                             }
                             else if (lo == TSParser.STR_METHOD) {
                                 st = type.getCallSignatures()[0];
-                                classObj[lo].push({
+                                var static_method_info = {
                                     name: ts.getDeclaredName(typeChecker, nd.symbol, nd),
                                     type: TSParser.getTypeString(typeChecker, st.getReturnType(), (findUnknownObject ? nd.symbol : null)),
                                     modifier: modifier,
                                     parameters: TSParser.getParameterInfo(typeChecker, st, findUnknownObject),
                                     text: ts.getTextOfNode(nd)
-                                });
+                                };
+                                methodGenericMatch = static_method_info.text.substr(0, static_method_info.text.indexOf('{')).match(exp_generic);
+                                if (methodGenericMatch) {
+                                    genericList[methodGenericMatch[1]] = 0;
+                                }
+                                classObj[lo].push(static_method_info);
                             }
                             lo = null;
                         }
                     }
                 }
+                data.genericList = genericList;
+                data.importList = importList;
                 return data;
             };
             TSParser.analysisObjectToYUMLCode = function (data, containMembers, relationConnect) {
-                //var data:any = TSParser.tsToAnalysisObject(text, findUnknownObject);
                 if (containMembers === void 0) { containMembers = true; }
                 if (relationConnect === void 0) { relationConnect = true; }
                 var list = [];
@@ -345,12 +424,17 @@ var tj;
                 var dclass;
                 var dinter;
                 var p, m, args;
-                var relation;
+                var relation = new RelationList(data.genericList);
                 list.push("//define");
                 if (data.class) {
                     for (var o in data.class) {
                         dclass = data.class[o];
-                        relation = dclass.relation || new RelationList();
+                        relation.addExceptionName(dclass.name);
+                        if (data.importList && data.importList[dclass.name]) {
+                            for (var key in data.importList[dclass.name]) {
+                                relation.add(key);
+                            }
+                        }
                         p = dclass.property;
                         m = dclass.method;
                         temp.length = 0;
@@ -402,14 +486,14 @@ var tj;
                         if (relation.length > 0) {
                             relation.repetitionRemoval();
                             dclass.relation = relation.getList();
-                            relation.reset();
                         }
+                        relation.reset();
                     }
                 }
                 if (data.interface) {
                     for (var o in data.interface) {
                         dinter = data.interface[o];
-                        relation = dinter.relation || new RelationList();
+                        relation.addExceptionName(dinter.name);
                         p = dinter.property;
                         m = dinter.method;
                         temp.length = 0;
@@ -461,8 +545,8 @@ var tj;
                         if (relation.length > 0) {
                             relation.repetitionRemoval();
                             dinter.relation = relation.getList();
-                            relation.reset();
                         }
+                        relation.reset();
                     }
                 }
                 list.push("//color");
@@ -484,13 +568,16 @@ var tj;
                             temp.length = 0;
                             temp.push("[" + dclass.super[oo] + "]");
                             if (TSParser.isInterface(data, dclass.super[oo])) {
-                                temp.push("^-.-");
+                                dclass.implements.push(dclass.super.splice(oo, 1)[0]);
                             }
                             else {
                                 temp.push("^");
                             }
                             temp.push("[" + dclass.name + "]");
                             list.push(temp.join(''));
+                        }
+                        for (var ooo in dclass.implements) {
+                            list.push("[" + dclass.implements[ooo] + "]^-.-" + "[" + dclass.name + "]");
                         }
                         if (dclass.relation && relationConnect) {
                             for (var oo in dclass.relation) {
@@ -530,8 +617,6 @@ var tj;
                 if (relationConnect === void 0) { relationConnect = true; }
                 return TSParser.analysisObjectToYUMLCode(TSParser.tsToAnalysisObject(text, findUnknownObject), containMembers, relationConnect);
             };
-            TSParser.host = new MyCompilerHost();
-            TSParser.languageService = ts.createLanguageService(TSParser.host, ts.createDocumentRegistry());
             TSParser.dummyScriptName = "script.ts";
             TSParser.Reg_startArray = /Array＜/;
             TSParser.STR_CLASS = "class";

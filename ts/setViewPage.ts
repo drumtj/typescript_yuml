@@ -13,6 +13,7 @@
   var fileListView:TSFileListView;
   var tabInfo;
   var extensionId;
+  var extension = "svg";
   var tsData:any;
 
   var $detailview;
@@ -22,6 +23,8 @@
   var $ajaxloader;
   var $usecaseImg;
   var $usecaseSvg;
+
+  tj.utils.TSParser.init();
 
   function setSideView( $parent:JQuery ){
 
@@ -44,113 +47,162 @@
     build();
   }
 
-  function build(){
+  function build(ext:string="svg"){
+    extension = ext;
     $("body").append($ajaxloader);
     $ajaxloader.show();
     $usecaseSvg.css({opacity: 0.5});
+    //console.log(fileListView.getMergeText());
     tsData = tscodeToTsobj(fileListView.getMergeText());
     send({com:"buildUrl", script:tsobjToYUMLCode(tsData)});
   }
 
   //특정클래스의 멤버포함빌드용
   var tsClassData;
-  function build2(tsScript:string){
-    //send({com:"buildUrl2", script:tsToYUMLCode(tsScript)});
-    //멤버포함
-    console.log("umlCode");
+  
+
+  //#151021 tj
+  //이미 클래스 정보가 있는 상태에서, UML스크립트 조합만 다시해서 빌드하도록 해보자.
+  //노드를 클릭하여 보는 UML을 특정 코드로만 빌드하기에는 타입정보같은 것들이 부족해서 아쉽다.
+  function targetBuild(className:string):boolean{
+
+    //tsClassData = tscodeToTsobj(tsScript, false);
+    var obj;
+    if( (obj = _.find(tsData.class, "name", className)) ){
+      tsClassData = {
+        class: [obj],
+        genericList: tsData.genericList
+      }
+    }else if( (obj = _.find(tsData.interface, "name", className)) ){
+      tsClassData = {
+        interface: [obj],
+        genericList: tsData.genericList
+      }
+    }else{
+      return false;
+    }
+
     $detailviewSvg.children().remove();
     $detailview.append($ajaxloader);
     $ajaxloader.show();
-    tsClassData = tscodeToTsobj(tsScript, false);
-    var c = tsobjToYUMLCode(tsClassData, true, false);
-    console.log(c)
-    send({com:"buildUrl2", script:c});
 
+    send({com:"buildUrl2", script:tsobjToYUMLCode(tsClassData, true, false)});
+
+    return true;
   }
 
   //var selectNode;
+  //비동기식
   function buildUrlComplete(src:string){
 
+    if( extension == "png" ){
+      window.open(src, "_blank");
+      $usecaseSvg.css({opacity: 1});
+      $ajaxloader.hide();
+    }else{
+      src = src.replace(".png", ".svg");
 
-    src = src.replace(".png", ".svg");
+      $.ajax({
+  			type: "POST",
+  			url: src,
+  			success: function(data){
+          //console.log($(data));
+          var svgDoc = data;
+          var svg = svgDoc.documentElement;
 
-    $.ajax({
-			type: "POST",
-			url: src,
-			success: function(data){
-        //console.log($(data));
-        var svgDoc = data;
-        var svg = svgDoc.documentElement;
-        //var svgScript = $(svgDoc).children(":first");
-        $usecaseSvg.children().remove();
-        $usecaseSvg.append( svg );
-        //$usecaseSvg.append( svgScript );
-        $usecaseSvg.css({opacity: 1});
-        $ajaxloader.hide();
-        //$usecaseSvg.find("g.node").click(function(){
-        $(svg).find("g>g.node").click(function(){
-          var nodeName = $(this).find("text:first").text();
-          //https://lodash.com/docs#find
-          var selectNode:any = (_.find(tsData.class, "name", nodeName) || _.find(tsData.interface, "name", nodeName));
-          if(selectNode){
-            build2(selectNode.text);
+          $usecaseSvg.children().remove();
+          $usecaseSvg.append( svg );
 
-            $detailview.dialog({
-              close:function(event,ui){
-                $detailviewSvg.children(":first").remove();
-                //svg렌더가 이상해짐. 색깔이 빠짐. 다시 넣으면 정상... 왜그럴까
-                $usecaseSvg.append( $usecaseSvg.children(":first") );
+          $usecaseSvg.css({opacity: 1});
+          $ajaxloader.hide();
+
+          var $svg = $(svg);
+          var $bindTarget;
+          if( $("#memberCheck").is(":checked") ){
+            $bindTarget = $svg.find("g>g.node>text").click(function(e){
+              var $classNameNode = $(this).parent().find("text:first");
+              var className = $classNameNode.text();
+              if($(this).is($classNameNode)){
+                classClick( className );
+              }else{
+                var methodName = $(this).text().match(/([A-Za-z$_0-1]+)(\s+)?\(/);
+                if( methodName && methodName[1] ){
+                  methodClick(className, methodName[1]);
+                }else{
+                  alert("The function name in the wrong format.\n" + methodName);
+                }
               }
             });
           }else{
-            alert("not found");
+            $bindTarget = $svg.find("g>g.node").click(function(e){
+              classClick($(this).find("text:first").text());
+            });
           }
-        }).css("cursor","pointer");
-        console.log(tsData);
-      },
-      error: function(e){
-        alert(e);
-      }
-		});
+
+          $bindTarget.hover(function(){
+            $(this).css("text-decoration", "underline");
+          },function(){
+            $(this).css("text-decoration", "");
+          })
+          .css("cursor","pointer");
+
+
+
+          console.log(tsData);
+        },
+        error: function(e){
+          alert(e);
+        }
+  		});
+    }
   }
 
-  /*
-  function buildUrlComplete(src:string){
+  function classClick(className:string){
 
-    //$usecaseImg.css({opacity: 1}).attr("src", src);
-    src = src.replace(".png", ".svg");
-    var svgScript = $.ajax({
-			type: "POST",
-			url: src,
-			async: false,
-		}).responseText;
+      //#151021 tj
+    if(targetBuild(className)){
 
-    $usecaseSvg.children().remove();
-    $usecaseSvg.append( svgScript );
-    $ajaxloader.hide();
-
-    $usecaseSvg.find("g.node").click(function(){
-      var nodeName = $(this).find("text").text();
-      //https://lodash.com/docs#find
-      var selectNode:any = (_.find(tsData.class, "name", nodeName) || _.find(tsData.interface, "name", nodeName));
-      if(selectNode){
-        build2(selectNode.text);
-
-        $detailview.dialog({
-          close:function(event,ui){
-            $detailviewSvg.children(":first").remove();
-            //svg렌더가 이상해짐. 색깔이 빠짐. 다시 넣으면 정상... 왜그럴까
-            $usecaseSvg.append( $usecaseSvg.children(":first") );
-          }
-        });
-      }else{
-        alert("not found");
-      }
-    }).css("cursor","pointer");
-    console.log(tsData);
+      $detailview.dialog({
+        close:function(event,ui){
+          $detailviewSvg.children(":first").remove();
+          //svg렌더가 이상해짐. 색깔이 빠짐. 다시 넣으면 정상... 왜그럴까
+          $usecaseSvg.append( $usecaseSvg.children(":first") );
+        }
+      });
+    }else{
+      alert("not found");
+    }
   }
-  */
 
+  function methodClick(className:string, methodName:string){
+    //var nodeName = $(this).text();
+    //if( nodeText.indexOf('(') > -1 ){
+      //var funcName = nodeText.match(/[A-Za-z$_0-1]+/)[0];
+      console.log(className, methodName);
+      var classObj:any = _.find(tsData.class, "name", className);
+      if( classObj ){
+        //https://lodash.com/docs#find
+        var methodInfo:any = _.find(classObj.method, "name", methodName);
+        if(methodInfo){
+          var script = ts.transpile(methodInfo.text);
+          $codeview.find("xmp").html(script).removeClass("prettyprinted");//.addClass("prettyprint prettyprinted");//"prettyprint lang-js linenums prettyprinted");
+          $codeview.dialog({
+            open: function(){
+              if( window['prettyPrint'] ) window['prettyPrint']();
+            }
+
+          });
+          $codeview.dialog("option", {"width":600, "height":400});
+        }else{
+          alert("can not found");
+        }
+      }
+    //}
+  }
+
+
+
+  //비동기식
   function buildUrlCompleteForTemp(src:string){
     //console.log("buildUrlCompleteForTemp:", src);
 
@@ -165,24 +217,22 @@
         $detailviewSvg.append(svg);
 
         $ajaxloader.hide();
-        console.log("tsClassData",tsClassData);
 
-        //$detailviewSvg.find("text").click(function(){
         $(svg).find("g>g.node>text").click(function(){
-          var nodeName = $(this).text();
-          if( nodeName.indexOf('(') > -1 ){
-            var funcName = nodeName.match(/[A-Za-z$_0-1]+/)[0];
-            if( tsClassData && tsClassData.class[0] ){
-              //https://lodash.com/docs#find
-              var methodInfo:any = _.find(tsClassData.class[0].method, "name", funcName);
-              if(methodInfo){
-                $codeview.find("pre").text(ts.transpile(methodInfo.text));
-                $codeview.dialog();
-                $codeview.dialog("option", {"width":600, "height":400});
-              }
-            }
+          var className = $(this).parent().find("text:first").text();
+          var methodName = $(this).text().match(/([A-Za-z$_0-1]+)(\s+)?\(/);
+          if( methodName && methodName[1] ){
+            methodClick(className, methodName[1]);
+          }else{
+            alert("The function name in the wrong format.\n" + methodName);
           }
-        }).css("cursor","pointer");
+
+        }).css("cursor","pointer")
+        .hover(function(){
+          $(this).css("text-decoration", "underline");
+        },function(){
+          $(this).css("text-decoration", "");
+        });
 
         $detailview.dialog( "option", {
           "height": $detailviewSvg.children(":first").height() + 80,
@@ -195,41 +245,6 @@
 		});
   }
 
-  /*
-  function buildUrlCompleteForTemp(src:string){
-    //console.log("buildUrlCompleteForTemp:", src);
-    src = src.replace(".png", ".svg");
-    var svgScript = $.ajax({
-			type: "POST",
-			url: src,
-			async: false,
-		}).responseText;
-    $detailviewSvg.append(svgScript);
-
-    console.log("tsClassData",tsClassData);
-
-    $detailviewSvg.find("text").click(function(){
-      var nodeName = $(this).text();
-      if( nodeName.indexOf('(') > -1 ){
-        var funcName = nodeName.match(/[A-Za-z$_0-1]+/)[0];
-        if( tsClassData && tsClassData.class[0] ){
-          //https://lodash.com/docs#find
-          var methodInfo:any = _.find(tsClassData.class[0].method, "name", funcName);
-          if(methodInfo){
-            $codeview.find("pre").text(ts.transpile(methodInfo.text));
-            $codeview.dialog();
-            $codeview.dialog("option", {"width":600, "height":400});
-          }
-        }
-      }
-    }).css("cursor","pointer");
-
-    $detailview.dialog( "option", {
-      "height": $detailviewSvg.children(":first").height() + 80,
-      "width": $detailviewSvg.children(":first").width() + 50
-    });
-  }
-  */
 
   function tsobjToYUMLCode(obj:any, containMember?:boolean, relationConnect?:boolean):string{
       return tj.utils.TSParser.analysisObjectToYUMLCode(
@@ -241,17 +256,6 @@
 
   function tscodeToYUMLCode(tsScript:string):string{
     return tsobjToYUMLCode(tscodeToTsobj(tsScript));
-    //fileListView.getMergeText()
-    //return tj.utils.TSParser.tsToYUMLCode(fileListView.getMergeText(), $("#memberCheck").is(":checked"), $("#unknownCheck").is(":checked"), !$("#onlyInheritCheck").is(":checked"));
-
-    /*
-    if(!tsScript){
-      tsData = tj.utils.TSParser.tsToAnalysisObject(fileListView.getMergeText(), $("#unknownCheck").is(":checked"));
-      return tj.utils.TSParser.analysisObjectToYUMLCode(tsData, $("#memberCheck").is(":checked"), !$("#onlyInheritCheck").is(":checked"));
-    }else{
-      return tj.utils.TSParser.tsToYUMLCode(tsScript, $("#memberCheck").is(":checked"), $("#unknownCheck").is(":checked"), !$("#onlyInheritCheck").is(":checked"));
-    }
-    */
   }
 
   function tscodeToTsobj(tsScript:string, findUnknowObject?:boolean):any{
@@ -293,11 +297,11 @@
     $("#buildBtn").click(function(){
       build();
     });
+    $("#buildBtnForPng").click(function(){
+      build("png");
+      //alert("준비중입니당");
+    });
 
     setSideView( $container );
-
-    //console.log(ts.transpile('getAnswerForCreateAnswerMode():string { if (this.options.createAnswerMode) { return this.createAnswerDialog.getAnswer(); } return null; })'));
-    //console.log(ts.transpile('getAnswerForCreateAnswerMode();string; { if (this.options.createAnswerMode) { return this.createAnswerDialog.getAnswer(); } return null; })'));
-    //console.log('getAnswerForCreateAnswerMode();string; { if (this.options.createAnswerMode) { return this.createAnswerDialog.getAnswer(); } return null; })');
   });
 }());

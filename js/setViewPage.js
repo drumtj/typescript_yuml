@@ -1,10 +1,3 @@
-/// <reference path="./jquery/jquery.d.ts"/>
-///// <reference path="./chrome/chrome.d.ts"/>
-/// <reference path="./TSParser/TSParser.d.ts"/>
-/// <reference path="./TSFile.ts"/>
-/// <reference path="./TSFileDropper.ts"/>
-/// <reference path="./TSFileListView.ts"/>
-/// <reference path="./SideView.ts"/>
 (function () {
     var $container;
     var sideView;
@@ -12,6 +5,7 @@
     var fileListView;
     var tabInfo;
     var extensionId;
+    var extension = "svg";
     var tsData;
     var $detailview;
     var $detailviewSvg;
@@ -19,6 +13,7 @@
     var $ajaxloader;
     var $usecaseImg;
     var $usecaseSvg;
+    tj.utils.TSParser.init();
     function setSideView($parent) {
         sideView = new SideView("400px", "100%", "rgba(200, 200, 200, 0.79)");
         $parent.append(sideView.$el);
@@ -33,7 +28,9 @@
         }
         build();
     }
-    function build() {
+    function build(ext) {
+        if (ext === void 0) { ext = "svg"; }
+        extension = ext;
         $("body").append($ajaxloader);
         $ajaxloader.show();
         $usecaseSvg.css({ opacity: 0.5 });
@@ -41,53 +38,121 @@
         send({ com: "buildUrl", script: tsobjToYUMLCode(tsData) });
     }
     var tsClassData;
-    function build2(tsScript) {
-        console.log("umlCode");
+    function targetBuild(className) {
+        var obj;
+        if ((obj = _.find(tsData.class, "name", className))) {
+            tsClassData = {
+                class: [obj],
+                genericList: tsData.genericList
+            };
+        }
+        else if ((obj = _.find(tsData.interface, "name", className))) {
+            tsClassData = {
+                interface: [obj],
+                genericList: tsData.genericList
+            };
+        }
+        else {
+            return false;
+        }
         $detailviewSvg.children().remove();
         $detailview.append($ajaxloader);
         $ajaxloader.show();
-        tsClassData = tscodeToTsobj(tsScript, false);
-        var c = tsobjToYUMLCode(tsClassData, true, false);
-        console.log(c);
-        send({ com: "buildUrl2", script: c });
+        send({ com: "buildUrl2", script: tsobjToYUMLCode(tsClassData, true, false) });
+        return true;
     }
     function buildUrlComplete(src) {
-        src = src.replace(".png", ".svg");
-        $.ajax({
-            type: "POST",
-            url: src,
-            success: function (data) {
-                var svgDoc = data;
-                var svg = svgDoc.documentElement;
-                $usecaseSvg.children().remove();
-                $usecaseSvg.append(svg);
-                $usecaseSvg.css({ opacity: 1 });
-                $ajaxloader.hide();
-                $(svg).find("g>g.node").click(function () {
-                    var nodeName = $(this).find("text:first").text();
-                    var selectNode = (_.find(tsData.class, "name", nodeName) || _.find(tsData.interface, "name", nodeName));
-                    if (selectNode) {
-                        build2(selectNode.text);
-                        $detailview.dialog({
-                            close: function (event, ui) {
-                                $detailviewSvg.children(":first").remove();
-                                $usecaseSvg.append($usecaseSvg.children(":first"));
+        if (extension == "png") {
+            window.open(src, "_blank");
+            $usecaseSvg.css({ opacity: 1 });
+            $ajaxloader.hide();
+        }
+        else {
+            src = src.replace(".png", ".svg");
+            $.ajax({
+                type: "POST",
+                url: src,
+                success: function (data) {
+                    var svgDoc = data;
+                    var svg = svgDoc.documentElement;
+                    $usecaseSvg.children().remove();
+                    $usecaseSvg.append(svg);
+                    $usecaseSvg.css({ opacity: 1 });
+                    $ajaxloader.hide();
+                    var $svg = $(svg);
+                    var $bindTarget;
+                    if ($("#memberCheck").is(":checked")) {
+                        $bindTarget = $svg.find("g>g.node>text").click(function (e) {
+                            var $classNameNode = $(this).parent().find("text:first");
+                            var className = $classNameNode.text();
+                            if ($(this).is($classNameNode)) {
+                                classClick(className);
+                            }
+                            else {
+                                var methodName = $(this).text().match(/([A-Za-z$_0-1]+)(\s+)?\(/);
+                                if (methodName && methodName[1]) {
+                                    methodClick(className, methodName[1]);
+                                }
+                                else {
+                                    alert("The function name in the wrong format.\n" + methodName);
+                                }
                             }
                         });
                     }
                     else {
-                        alert("not found");
+                        $bindTarget = $svg.find("g>g.node").click(function (e) {
+                            classClick($(this).find("text:first").text());
+                        });
                     }
-                }).css("cursor", "pointer");
-                console.log(tsData);
-            },
-            error: function (e) {
-                alert(e);
+                    $bindTarget.hover(function () {
+                        $(this).css("text-decoration", "underline");
+                    }, function () {
+                        $(this).css("text-decoration", "");
+                    })
+                        .css("cursor", "pointer");
+                    console.log(tsData);
+                },
+                error: function (e) {
+                    alert(e);
+                }
+            });
+        }
+    }
+    function classClick(className) {
+        if (targetBuild(className)) {
+            $detailview.dialog({
+                close: function (event, ui) {
+                    $detailviewSvg.children(":first").remove();
+                    $usecaseSvg.append($usecaseSvg.children(":first"));
+                }
+            });
+        }
+        else {
+            alert("not found");
+        }
+    }
+    function methodClick(className, methodName) {
+        console.log(className, methodName);
+        var classObj = _.find(tsData.class, "name", className);
+        if (classObj) {
+            var methodInfo = _.find(classObj.method, "name", methodName);
+            if (methodInfo) {
+                var script = ts.transpile(methodInfo.text);
+                $codeview.find("xmp").html(script).removeClass("prettyprinted");
+                $codeview.dialog({
+                    open: function () {
+                        if (window['prettyPrint'])
+                            window['prettyPrint']();
+                    }
+                });
+                $codeview.dialog("option", { "width": 600, "height": 400 });
             }
-        });
+            else {
+                alert("can not found");
+            }
+        }
     }
     function buildUrlCompleteForTemp(src) {
-        //console.log("buildUrlCompleteForTemp:", src);
         src = src.replace(".png", ".svg");
         var svgScript = $.ajax({
             type: "POST",
@@ -97,21 +162,21 @@
                 var svg = svgDoc.documentElement;
                 $detailviewSvg.append(svg);
                 $ajaxloader.hide();
-                console.log("tsClassData", tsClassData);
                 $(svg).find("g>g.node>text").click(function () {
-                    var nodeName = $(this).text();
-                    if (nodeName.indexOf('(') > -1) {
-                        var funcName = nodeName.match(/[A-Za-z$_0-1]+/)[0];
-                        if (tsClassData && tsClassData.class[0]) {
-                            var methodInfo = _.find(tsClassData.class[0].method, "name", funcName);
-                            if (methodInfo) {
-                                $codeview.find("pre").text(ts.transpile(methodInfo.text));
-                                $codeview.dialog();
-                                $codeview.dialog("option", { "width": 600, "height": 400 });
-                            }
-                        }
+                    var className = $(this).parent().find("text:first").text();
+                    var methodName = $(this).text().match(/([A-Za-z$_0-1]+)(\s+)?\(/);
+                    if (methodName && methodName[1]) {
+                        methodClick(className, methodName[1]);
                     }
-                }).css("cursor", "pointer");
+                    else {
+                        alert("The function name in the wrong format.\n" + methodName);
+                    }
+                }).css("cursor", "pointer")
+                    .hover(function () {
+                    $(this).css("text-decoration", "underline");
+                }, function () {
+                    $(this).css("text-decoration", "");
+                });
                 $detailview.dialog("option", {
                     "height": $detailviewSvg.children(":first").height() + 80,
                     "width": $detailviewSvg.children(":first").width() + 50
@@ -159,6 +224,9 @@
         $usecaseSvg = $("#usecaseSvg");
         $("#buildBtn").click(function () {
             build();
+        });
+        $("#buildBtnForPng").click(function () {
+            build("png");
         });
         setSideView($container);
     });

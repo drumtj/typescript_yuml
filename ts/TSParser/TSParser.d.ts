@@ -1,5 +1,6 @@
 declare module tj.utils{
   class TSParser {
+    static init();
     static STR_CLASS:string;
     static STR_INTERFACE:string;
     static STR_METHOD:string;

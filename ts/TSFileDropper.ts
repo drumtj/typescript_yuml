@@ -78,7 +78,7 @@ class TSFileDropper{
   			$state[0].innerHTML = 'loaded : ' + files[idx].name;
 
         var scriptText = event.target.result;
-        scriptText = scriptText.replace(/^import\s/g,"//import ");
+        //scriptText = scriptText.replace(/^(\s+)?import\s/g,"//import ").replace(/\n(\s+)?import\s/g,"//import ").replace(/\n(\s+)?export\s?\=/g,"//export=");
         tsfiles.push(new TSFile(files[idx].name, scriptText));
 
         idx++;
@@ -89,33 +89,6 @@ class TSFileDropper{
 
 		  return false;
 		});
-    /*
-		$holder.bind("drop", this, function (e:any) {
-		  this.className = '';
-		  e.preventDefault();
-		  var file = e.originalEvent.dataTransfer.files[0], reader = new FileReader();
-		  reader.onload = function (event:any) {
-        var self = e.data;
-  			$state[0].className = 'success';
-  			$state[0].innerHTML = 'loaded : ' + file.name;
 
-        if( self.fileDropHandle ){
-          var scriptText = event.target.result;
-          scriptText = scriptText.replace(/^import\s/g,"//import ");
-          self.fileDropHandle.call(self, new TSFile(file.name, scriptText));
-        }
-		  };
-		  //console.log("file", file);
-		  if( /.ts$/.test(file.name) ){
-			  reader.readAsText(file);
-		  }else{
-			 //alert("ts파일이 아닙니다");
-			 $state[0].className = 'fail';
-			 $state.html('ts파일이 아닙니다');
-		  }
-
-		  return false;
-		});
-    */
   }
 }

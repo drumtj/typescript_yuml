@@ -53,7 +53,6 @@ var TSFileDropper = (function () {
                 $state[0].className = 'success';
                 $state[0].innerHTML = 'loaded : ' + files[idx].name;
                 var scriptText = event.target.result;
-                scriptText = scriptText.replace(/^import\s/g, "//import ");
                 tsfiles.push(new TSFile(files[idx].name, scriptText));
                 idx++;
                 addTsfile();

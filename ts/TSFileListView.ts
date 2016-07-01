@@ -73,6 +73,7 @@ class TSFileListView{
 		for(var i=0; i<this.list.length; i++){
       if(this.list[i].enable){
 		    t.push(this.list[i].text);
+        t.push("/*eof*/");
       }
 		}
     return t.join('\n');
