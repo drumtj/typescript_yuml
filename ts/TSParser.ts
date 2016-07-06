@@ -232,7 +232,7 @@ module tj.utils{
       var str = typeChecker.typeToString( type );
       //console.log("type:",type, "str:",str, "symbol:",symbol);
       //console.log("typeToString", str);
-      if( str.indexOf("{") > -1 ) return "any";
+      if( str.indexOf("{") > -1 ) return "Object";
       //if( str == "{}" ) return "any";
       if( str.charAt(0) == "(" ) return "Function";
 
@@ -253,10 +253,14 @@ module tj.utils{
       }
       //typeChecker.typeToString( type );
       //console.log(str);
+      /*
       if( str.indexOf('|') > -1 ){
         return "any";
       }
-
+      */
+      if( str.indexOf('|') > -1 ){
+          str = str.replace(/\|/g, "｜");
+      }
       if( str.indexOf('<') > -1 ){
         str = str.replace(/</g,"＜").replace(/>/g,"＞");
       }
@@ -396,7 +400,7 @@ module tj.utils{
       var exp_generic = /<(\w+)( extends )?(\w+)?>/;
       var propertyInfo, methodInfo;
       var genericList = {};
-      var typeName, txtOfNode;
+      var typeName, txtOfNode, methodTextArr;
 
       for (let key in decls) {
         for (let key1 in decls[key]) {
@@ -493,9 +497,9 @@ module tj.utils{
 
 
 
+
               //console.log(name,"-",symbol.name);
               if( l == TSParser.STR_PROPERTY ){
-
                 typeName = null;
                 txtOfNode = ts.getTextOfNode(nd3);
                 if(symbol["valueDeclaration"] && symbol["valueDeclaration"]["type"]){
@@ -523,11 +527,28 @@ module tj.utils{
                 classObj[l].push(propertyInfo);
               }else if( l == TSParser.STR_METHOD ){
                 st = ty3.getCallSignatures()[0];
-
+                typeName = null;
                 //console.log(ts.getDeclaredName(typeChecker, symbol, nd3), typeChecker.typeToString(st.getReturnType()), TSParser.getTypeString(typeChecker, st.getReturnType(), (findUnknownObject ? symbol : null)))
+                //console.log(ts.getTextOfNode(nd3), symbol);
+                txtOfNode = ts.getTextOfNode(nd3).replace(/\s/g, "");
+                methodTextArr = txtOfNode.split("):");
+
+                //#160706 tj
+                //이제 메서드의 literal type은 정의되지않은 상황을 빼고는 코드에서 직접 추출한다.
+                if( methodTextArr.length > 1 ){
+                  methodTextArr[1] = methodTextArr[1].replace(";", "").replace(/\|/g, "｜");
+                  if( methodTextArr[1].indexOf("[]") > -1 ) {
+                    typeName = methodTextArr[1].replace(/\[\]/g, "［］");
+                  } else if( methodTextArr[1].indexOf("Array") > -1 ){
+                    typeName = methodTextArr[1].replace(/\</g, "〈").replace(/\>/g, "〉");
+                  } else {
+                    typeName = methodTextArr[1];
+                  }
+                }
+
                 methodInfo = {
                   name:ts.getDeclaredName(typeChecker, symbol, nd3),
-                  type: TSParser.getTypeString(typeChecker, st.getReturnType(), (findUnknownObject ? symbol : null)),
+                  type: typeName ? typeName : TSParser.getTypeString(typeChecker, st.getReturnType(), (findUnknownObject ? symbol : null)),
                   modifier: TSParser.getNodeModifiers(nd3),
                   parameters: TSParser.getParameterInfo(typeChecker, st, findUnknownObject),
                   text: ts.getTextOfNode(nd3)

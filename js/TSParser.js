@@ -190,7 +190,7 @@ var tj;
             TSParser.getTypeString = function (typeChecker, type, symbol) {
                 var str = typeChecker.typeToString(type);
                 if (str.indexOf("{") > -1)
-                    return "any";
+                    return "Object";
                 if (str.charAt(0) == "(")
                     return "Function";
                 if (symbol && str == "any" && symbol["valueDeclaration"] && symbol["valueDeclaration"]["type"]) {
@@ -199,7 +199,7 @@ var tj;
                         return "any";
                 }
                 if (str.indexOf('|') > -1) {
-                    return "any";
+                    str = str.replace(/\|/g, "｜");
                 }
                 if (str.indexOf('<') > -1) {
                     str = str.replace(/</g, "＜").replace(/>/g, "＞");
@@ -292,7 +292,7 @@ var tj;
                 var exp_generic = /<(\w+)( extends )?(\w+)?>/;
                 var propertyInfo, methodInfo;
                 var genericList = {};
-                var typeName, txtOfNode;
+                var typeName, txtOfNode, methodTextArr;
                 for (var key in decls) {
                     for (var key1 in decls[key]) {
                         nd = decls[key][key1];
@@ -382,9 +382,24 @@ var tj;
                                 }
                                 else if (l == TSParser.STR_METHOD) {
                                     st = ty3.getCallSignatures()[0];
+                                    typeName = null;
+                                    txtOfNode = ts.getTextOfNode(nd3).replace(/\s/g, "");
+                                    methodTextArr = txtOfNode.split("):");
+                                    if (methodTextArr.length > 1) {
+                                        methodTextArr[1] = methodTextArr[1].replace(";", "").replace(/\|/g, "｜");
+                                        if (methodTextArr[1].indexOf("[]") > -1) {
+                                            typeName = methodTextArr[1].replace(/\[\]/g, "［］");
+                                        }
+                                        else if (methodTextArr[1].indexOf("Array") > -1) {
+                                            typeName = methodTextArr[1].replace(/\</g, "〈").replace(/\>/g, "〉");
+                                        }
+                                        else {
+                                            typeName = methodTextArr[1];
+                                        }
+                                    }
                                     methodInfo = {
                                         name: ts.getDeclaredName(typeChecker, symbol, nd3),
-                                        type: TSParser.getTypeString(typeChecker, st.getReturnType(), (findUnknownObject ? symbol : null)),
+                                        type: typeName ? typeName : TSParser.getTypeString(typeChecker, st.getReturnType(), (findUnknownObject ? symbol : null)),
                                         modifier: TSParser.getNodeModifiers(nd3),
                                         parameters: TSParser.getParameterInfo(typeChecker, st, findUnknownObject),
                                         text: ts.getTextOfNode(nd3)
