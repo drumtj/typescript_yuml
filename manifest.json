@@ -19,6 +19,6 @@
    "name": "yuml typescript",
    "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'",
    "permissions": [ "http://*/*", "https://*/*", "tabs", "activeTab" ],
-   "version": "0.0.4",
+   "version": "0.0.5",
    "web_accessible_resources": [ "js/jquery-2.1.3.min.js", "js/setBuildPage.js" ]
 }

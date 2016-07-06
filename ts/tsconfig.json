@@ -32,6 +32,7 @@
         "./TSFile.ts",
         "./TSFileDropper.ts",
         "./TSFileListView.ts",
+        "./TSParser.ts",
         "./TSParser/TSParser.d.ts",
         "./typescript/typescriptServices.d.ts"
     ],

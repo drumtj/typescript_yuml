@@ -1,3 +1,4 @@
+/*
 declare module tj.utils{
   class TSParser {
     static init();
@@ -20,3 +21,4 @@ declare module tj.utils{
     static tsToYUMLCode(text:string, containMembers:boolean, findUnknownObject:boolean, relationConnect:boolean):string;
   }
 }
+*/

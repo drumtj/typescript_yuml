@@ -43,7 +43,7 @@ var tj;
                 }
             };
             return MyLanguageServiceHost;
-        })();
+        }());
         var MyCompilerHost = (function (_super) {
             __extends(MyCompilerHost, _super);
             function MyCompilerHost() {
@@ -62,7 +62,7 @@ var tj;
             MyCompilerHost.prototype.writeFile = function (filename, data, writeByteOrderMark, onError) {
             };
             return MyCompilerHost;
-        })(MyLanguageServiceHost);
+        }(MyLanguageServiceHost));
         var RelationList = (function () {
             function RelationList(exceptList) {
                 this.regDefaultArrayType = /＜([A-za-z_\$]+)＞/;
@@ -124,7 +124,7 @@ var tj;
                 }
             };
             return RelationList;
-        })();
+        }());
         var TSParser = (function () {
             function TSParser() {
             }
@@ -292,6 +292,7 @@ var tj;
                 var exp_generic = /<(\w+)( extends )?(\w+)?>/;
                 var propertyInfo, methodInfo;
                 var genericList = {};
+                var typeName, txtOfNode;
                 for (var key in decls) {
                     for (var key1 in decls[key]) {
                         nd = decls[key][key1];
@@ -317,7 +318,7 @@ var tj;
                             expList = [];
                             if (typeof nd["heritageClauses"] !== TSParser.STR_UNDEFINED) {
                                 var hnd = nd["heritageClauses"][0];
-                                var expressNode;
+                                var expressNode = void 0;
                                 var expNameArr = [];
                                 for (var r = 0; r < hnd.types.length; r++) {
                                     expressNode = ts.getEntityNameFromTypeNode(hnd.types[r]);
@@ -358,9 +359,23 @@ var tj;
                                 nd3 = symbol.getDeclarations()[0];
                                 ty3 = typeChecker.getTypeAtLocation(nd3);
                                 if (l == TSParser.STR_PROPERTY) {
+                                    typeName = null;
+                                    txtOfNode = ts.getTextOfNode(nd3);
+                                    if (symbol["valueDeclaration"] && symbol["valueDeclaration"]["type"]) {
+                                        typeName = ts.getTextOfNode(symbol["valueDeclaration"]["type"]);
+                                        if (txtOfNode.indexOf("[]") > -1) {
+                                            typeName = typeName.replace(/\[\]/g, "［］");
+                                        }
+                                        else if (txtOfNode.indexOf("Array") > -1) {
+                                            typeName = typeName.replace(/\</g, "〈").replace(/\>/g, "〉");
+                                        }
+                                        else {
+                                            typeName = null;
+                                        }
+                                    }
                                     propertyInfo = {
                                         name: ts.getDeclaredName(typeChecker, symbol, nd3),
-                                        type: TSParser.getTypeString(typeChecker, ty3, (findUnknownObject ? symbol : null)),
+                                        type: typeName ? typeName : TSParser.getTypeString(typeChecker, ty3, (findUnknownObject ? symbol : null)),
                                         modifier: TSParser.getNodeModifiers(nd3)
                                     };
                                     classObj[l].push(propertyInfo);
@@ -599,6 +614,9 @@ var tj;
                         }
                     }
                 }
+                for (var i = 0; i < list.length; i++) {
+                    list[i] = list[i].split("-").sort().join("-");
+                }
                 var tempStr;
                 for (var i = 0; i < list.length; i++) {
                     tempStr = list[i];
@@ -629,8 +647,7 @@ var tj;
             TSParser.STR_COLOR_INTERFACE = "{bg:wheat}";
             TSParser.defaultTypeList = ["string", "void", "any", "boolean", "number"];
             return TSParser;
-        })();
+        }());
         utils.TSParser = TSParser;
     })(utils = tj.utils || (tj.utils = {}));
 })(tj || (tj = {}));
-//# sourceMappingURL=TSParser.js.map
