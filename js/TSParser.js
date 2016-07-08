@@ -95,14 +95,25 @@ var tj;
                     if (str.indexOf('［') > -1) {
                         str = str.replace(/［］/g, '');
                     }
+                    console.log(str);
+                    if (str.indexOf("｜") > -1) {
+                        var a = str.split("｜");
+                        for (var o in a) {
+                            if (a[o] != "Function" && a[o] != "Object" && !TSParser.isDefaultType(a[o]) && a[o] != "RegExp") {
+                                this.relation.push(str);
+                            }
+                        }
+                        return;
+                    }
                     if (str.indexOf('＜') > -1) {
                         var m = str.match(this.regDefaultArrayType);
+                        console.log(11111, str, m);
                         if (m)
                             str = m.pop();
                         else
                             return;
                     }
-                    if (str != "Function" && !TSParser.isDefaultType(str) && str != "RegExp") {
+                    if (str != "Function" && str != "Object" && !TSParser.isDefaultType(str) && str != "RegExp") {
                         this.relation.push(str);
                     }
                 }
@@ -367,7 +378,7 @@ var tj;
                                             typeName = typeName.replace(/\[\]/g, "［］");
                                         }
                                         else if (txtOfNode.indexOf("Array") > -1) {
-                                            typeName = typeName.replace(/\</g, "〈").replace(/\>/g, "〉");
+                                            typeName = typeName.replace(/\</g, "＜").replace(/\>/g, "＞");
                                         }
                                         else {
                                             typeName = null;
@@ -391,7 +402,7 @@ var tj;
                                             typeName = methodTextArr[1].replace(/\[\]/g, "［］");
                                         }
                                         else if (methodTextArr[1].indexOf("Array") > -1) {
-                                            typeName = methodTextArr[1].replace(/\</g, "〈").replace(/\>/g, "〉");
+                                            typeName = methodTextArr[1].replace(/\</g, "＜").replace(/\>/g, "＞");
                                         }
                                         else {
                                             typeName = methodTextArr[1];
@@ -629,8 +640,16 @@ var tj;
                         }
                     }
                 }
+                var pf;
                 for (var i = 0; i < list.length; i++) {
-                    list[i] = list[i].split("-").sort().join("-");
+                    pf = list[i].split("-");
+                    if (pf.length == 2 && pf[0] == pf[1]) {
+                        list.splice(i, 1);
+                        i--;
+                    }
+                    else {
+                        list[i] = pf.sort().join("-");
+                    }
                 }
                 var tempStr;
                 for (var i = 0; i < list.length; i++) {

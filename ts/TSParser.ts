@@ -66,6 +66,7 @@ module tj.utils{
       this.relation.length = n;
     }
     relation:Array<string> = [];
+    // fixedExceptLilst:Array<string> = ["Object", "string", "number", "boolean", "RegExp", "undefined", "null", "any", "void", "Function"];
     exceptList:any;
     constructor(exceptList?:any){
       if( exceptList ){
@@ -88,17 +89,26 @@ module tj.utils{
         if( str.indexOf('［') > -1 ){
           str = str.replace(/［］/g, '');
         }
+        console.log(str);
+        if( str.indexOf("｜") > -1 ){
+          let a = str.split("｜");
+          for(let o in a){
+            if( a[o] != "Function" && a[o] != "Object" && !TSParser.isDefaultType(a[o]) &&  a[o] != "RegExp" ){
+              this.relation.push( str );
+            }
+          }
+          return;
+        }
 
         //Array<string> 이런놈들은 여기로 오겠지. 하지만 이런애들은 연결관계를 표현할 놈들이 아니야
         if( str.indexOf('＜') > -1 ){
            var m = str.match(this.regDefaultArrayType);
-           //console.log(11111, str, m);
+           console.log(11111, str, m);
            if(m) str = m.pop();
            else return;
         }
-
         //알맹이만 빼서 다시 검사
-        if( str != "Function" && !TSParser.isDefaultType(str) &&  str != "RegExp" ){
+        if( str != "Function" && str != "Object" && !TSParser.isDefaultType(str) &&  str != "RegExp" ){
           this.relation.push( str );
         }
       }
@@ -507,7 +517,7 @@ module tj.utils{
                   if( txtOfNode.indexOf("[]") > -1 ) {
                     typeName = typeName.replace(/\[\]/g, "［］");
                   } else if( txtOfNode.indexOf("Array") > -1 ){
-                    typeName = typeName.replace(/\</g, "〈").replace(/\>/g, "〉");
+                    typeName = typeName.replace(/\</g, "＜").replace(/\>/g, "＞");
                   }else{
                     typeName = null;
                   }
@@ -540,7 +550,7 @@ module tj.utils{
                   if( methodTextArr[1].indexOf("[]") > -1 ) {
                     typeName = methodTextArr[1].replace(/\[\]/g, "［］");
                   } else if( methodTextArr[1].indexOf("Array") > -1 ){
-                    typeName = methodTextArr[1].replace(/\</g, "〈").replace(/\>/g, "〉");
+                    typeName = methodTextArr[1].replace(/\</g, "＜").replace(/\>/g, "＞");
                   } else {
                     typeName = methodTextArr[1];
                   }
@@ -683,7 +693,9 @@ module tj.utils{
                     //console.log(m[i].parameters[j].name + ":" + m[i].parameters[j].type)
                     temp.push( m[i].parameters[j].name + ":" + m[i].parameters[j].type );
                     //연관 객체 정리
-                    relation.add(m[i].parameters[j].type);
+                    //if( m[i].parameters[j].type.indexOf("｜") === -1 ){
+                      relation.add(m[i].parameters[j].type);
+                    //}
                 }
                 temp.push("):" + m[i].type);
                 //연관 객체 정리
@@ -848,10 +860,19 @@ module tj.utils{
         }
       }
 
-      //중복된 연결문법 제거
+
       //console.log("list:", list);
+      let pf;
       for (let i=0; i<list.length; i++) {
-        list[i] = list[i].split("-").sort().join("-");
+        pf = list[i].split("-");
+        if( pf.length == 2 && pf[0] == pf[1] ){
+          //자기참조 제거
+          list.splice(i,1);
+          i--;
+        }else{
+          //중복된 연결문법 제거
+          list[i] = pf.sort().join("-");
+        }
       }
 
       var tempStr;
@@ -864,7 +885,7 @@ module tj.utils{
           }
         }
       }
-
+      //console.log(list);
       return list.join('\n');
     }
 
